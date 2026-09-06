@@ -2,7 +2,7 @@ CC = gcc
 
 CFLAGS = -Ilib -Wall -Wextra -municode
 
-SRC = src/main.c src/wmi.c
+SRC = src/main.c src/chrome.c
 
 OUT = build/main.exe
 
